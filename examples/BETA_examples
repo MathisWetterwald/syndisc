@@ -1,1 +1,13 @@
+import dit
+from syndisc.pid import PID_SD_beta
 
+
+def Xor_Xor():
+    pmf = [1/4]*4
+    outcomes = ['0000','0111','1010','1101'] #X1,X2 are two independent bytes. Y1 is XOR(X1,X2), Y2 is X2.
+    #pmf = [1/4]*4
+    #outcomes = ['000','111','211','311']
+    d = dit.Distribution(outcomes, pmf)
+    return d
+
+print(PID_SD_beta(Xor_Xor(), X=[0,1], Y=[2,3],method='polytope', table='2D'))
