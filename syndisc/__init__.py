@@ -13,7 +13,7 @@ import syndisc.pid
 import syndisc.solver
 import syndisc.syndisc
 
-from syndisc.syndisc import disclosure, disclosure_channel
-from syndisc.syndisc import self_disclosure, self_disclosure_channel
+#from syndisc.syndisc import disclosure, disclosure_channel
+#from syndisc.syndisc import self_disclosure, self_disclosure_channel
 
 
