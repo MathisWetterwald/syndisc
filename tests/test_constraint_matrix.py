@@ -49,7 +49,8 @@ def test_constraint_marginal():
     u = dit.distconst.uniform_distribution(2,2)
     for _ in range(nb_reps):
         Pjoint = dit.random_distribution(2, 2)
-        marg = np.random.choice([[0], [1], [0,1]])
+        marg_list = [[0], [1], [0,1]]
+        marg = marg_list[np.random.randint(3)]
         P = build_constraint_matrix([marg], u)
         Pmarg = Pjoint.marginal(marg)
         Pmarg.make_dense()
@@ -60,4 +61,5 @@ def test_constraints_sets():
     """Test that constraint builder works with dit's FrozenSets as well as with
     lists."""
     pass
+
 
