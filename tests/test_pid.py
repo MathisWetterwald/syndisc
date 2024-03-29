@@ -6,7 +6,7 @@ Fernando Rosas and Pedro Mediano, 2019
 import numpy as np
 import dit
 
-from syndisc.pid import PID_SD
+from syndisc.pid import PID_SD_beta
 
 def assert_only_atom(pid, node, val):
     """
@@ -32,38 +32,38 @@ def assert_only_atom(pid, node, val):
 
 def test_xor():
     xor = dit.example_dists.Xor()
-    pid = PID_SD(xor)
-    assert_only_atom(pid, ((0,),(1,)), 1)
+    pid = PID_SD_beta(xor)
+    assert_only_atom(pid, (((0,),(1,)),()), 1)
 
 def test_4bit_xor():
     u = dit.distconst.uniform_distribution(3, 2)
     xorfun = lambda outcome: (np.mod(np.sum(outcome), 2),)
     dist = dit.insert_rvf(u, xorfun)
-    pid = PID_SD(dist)
-    assert_only_atom(pid, ((0,1),(0,2),(1,2)), 1)
+    pid = PID_SD_beta(dist)
+    assert_only_atom(pid, (((0,1),(0,2),(1,2)),()), 1)
 
 def test_copy_x0():
     # Target is a copy of x0 -- can be disclosed while keeping x1 private
     u = dit.distconst.uniform_distribution(2, 2)
     dist = u.coalesce([[0,1,0]], extract=True)
-    pid = PID_SD(dist)
-    assert_only_atom(pid, ((1,),), 1)
+    pid = PID_SD_beta(dist)
+    assert_only_atom(pid, (((1,),),()), 1)
 
 def test_giant_bit():
     # All sources and target are copies of the same bit
     dist = dit.example_dists.giant_bit(4)
-    pid = PID_SD(dist)
-    assert_only_atom(pid, (), 1)
+    pid = PID_SD_beta(dist)
+    assert_only_atom(pid, ((),()), 1)
 
 def test_uniform():
     # Everything is independent from everything
     dist = dit.distconst.uniform_distribution(4, 2)
-    pid = PID_SD(dist)
-    assert_only_atom(pid, ((0,),), 0)
+    pid = PID_SD_beta(dist)
+    assert_only_atom(pid, (((0,),),()), 0)
 
 def test_null():
     # Inputs are correlated between them but independent from output
     dist = dit.pid.distributions.trivariate.null
-    pid = PID_SD(dist)
-    assert_only_atom(pid, ((0,),), 0)
+    pid = PID_SD_beta(dist)
+    assert_only_atom(pid, (((0,),),()), 0)
 
