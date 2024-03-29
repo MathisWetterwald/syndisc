@@ -65,7 +65,6 @@ def extreme_points(P, Px, SVDmethod='standard'):
     # problems
     rankP = np.sum(S > 1e-6)
     A = Vh[:rankP,:]
-    
     b = np.matmul(A,Px)
     
     # Turn np.matrix into np.array for polytope computations
@@ -138,106 +137,9 @@ def lp_sol(c, A, b, mode='cvx'):
     return u, minH
 
 
-def syn_solve(P, Px, PWgX=None, SVDmethod='standard', extremes='normal'):
+
+def synsolve1D(pA, pBgA, polyA, direction='XtoY'):
     """
-    Computes the synergistic self-disclosure capacity, and provides the optimal
-    disclosure mapping.
-
-    Parameters
-    ----------
-    P : np.ndarray
-        binary (usually rectangular) matrix of transition
-    Px : np.ndarray
-        column vector with the pmf of X^n
-    PWgX : np.ndarray
-        conditional probability of W given X. If none, one computes the self-disclosure ("synergistic entropy" according to Quax)
-    SVDmethod : str
-        method for addressing the SVD of P (check help in extreme_points)
-    extremes : str
-        method for finding the extreme values of the polytope
-            'normal' is an exaustive search,
-            'fast' is just looking for a specific subset of directions (see help of function extreme_points, only valid for binary variables)
-    
-    Returns 
-    -------
-    Is : float
-        synergistic disclosure capacity
-    pYgX : np.ndarray
-        optimal disclosure mapping
-        
-    """
-    
-    # this is for numerical stability (avoid singular matrices and so)
-    Px = Px + 10**-40
-    Px = Px / Px.sum()
-
-    if np.any(PWgX) == None:
-        PWgX = np.eye( len(Px) )
-        
-    Px = np.array( [Px] ).T # transform vector input into a nx1 array
-
-    ## Find the extremes of the channel polytope
-    ext = extreme_points(P, Px, SVDmethod)
-    
-    if len(ext)==0:
-        print('Damn, the optimization didn\'t work well...')
-        return np.nan
-    
-    # find the c's
-    dist_for_ent = np.matmul(PWgX,ext.T)
-    c = [entropy(dist_for_ent[:,i],base=2) for i in range(len(ext))]
-    
-    ## Given these extremal entropies, solve the LP to find which distribution
-    # minimises the joint entropy
-    u, minH = lp_sol(np.array(c), ext.T, Px)
-    
-    if minH is None:
-        raise RuntimeError("Optimisation did not work well.")
-
-    elif (np.isnan(u).any()):
-        raise RuntimeError('Optimiser error: ' + res['message'])
-        
-    # compute I_s
-    Is = entropy(np.matmul(PWgX,Px),base=2) - minH
-    Is = Is[0]
-    
-    # compute mappings
-    u = quantize(u,1e-12)
-    ext_nonzero = ext[np.nonzero(u)]
-    PXgY = quantize(ext_nonzero.transpose(),1e-4)
-
-    u_nonzero = u[np.nonzero(u)]
-    pYgX = np.diag(u_nonzero)@ext_nonzero@np.linalg.inv(np.diagflat(Px.T))
-
-    # Return full channel dictionary
-    # (Note: change between Y and V is due to a mismatch between old notation
-    # in TIFS/WIFS papers and newer notation in PID paper.)
-    channel_dict = {'pV': u, 'pXgV': PXgY, 'pVgX': pYgX}
-
-    return Is, channel_dict
-
-
-def quantize(array,pres=0.01):
-    """
-    Function to reduce the decimal precision of an input array.
-
-    Parameters
-    ----------
-    array : np.array
-        numerical array to be quantized
-        
-    pres : float
-        desired precision
-
-    Returns
-    -------
-    np.array with quantized values
-    """
-    return ((pres**(-1))*array).round()*pres
-
-def synsolve1D(pA, pBgA, polyA):
-    """
-    from syndisc.solver
     Computes the synergistic self-disclosure capacity (alpha-synergy).
 
     Parameters
@@ -255,6 +157,10 @@ def synsolve1D(pA, pBgA, polyA):
         synergistic disclosure capacity
         
     """
+    #handle the direction
+    if direction!= 'XtoY' and direction !='YtoX':
+        raise Exception('direction should be "XtoY" or "YtoX" ! ')
+    
     #find extremal entropies
     dist_for_ent = np.matmul(pBgA, polyA.T)
     c = [entropy(dist_for_ent[:,i],base=2) for i in range(len(polyA))]
@@ -264,7 +170,25 @@ def synsolve1D(pA, pBgA, polyA):
     
     #compute I_s
     Is = entropy(np.matmul(pBgA,pA),base=2) - minH
-    return Is
+    
+    # compute mappings
+    u = quantize(u,1e-12)
+    polyA_nonzero = polyA[np.nonzero(u)]
+    pAgV = quantize(polyA_nonzero.transpose(),1e-4)
+    
+    u_nonzero = u[np.nonzero(u)]
+    pA = pA + 1e-40     #avoid numerical issues
+    pA = pA/pA.sum()    # (singular matrices)
+    pVgA = np.diag(u_nonzero)@polyA_nonzero@np.linalg.inv(np.diagflat(pA.T))
+    
+    #build the dictionary
+    if direction =='XtoY':
+        channel_dict = {'pU': u, 'pXgU': pAgV, 'pUgX': pVgA}
+    
+    if direction =='YtoX':
+        channel_dict = {'pV': u, 'pYgV': pAgV, 'pVgY': pVgA}
+    
+    return Is, channel_dict
 
 
 def synsolvebeta(pY, pX, pYgX, pXgU, pYgV, **kwargs):
@@ -273,7 +197,7 @@ def synsolvebeta(pY, pX, pYgX, pXgU, pYgV, **kwargs):
     Parameters
     ----------
     pY : np.ndarray
-        column vecto with the pmf of Y^m
+        column vector with the pmf of Y^m
     pX : np.ndarray
         column vector with the pmf of X^n
     pYgX : np.ndarray
@@ -378,7 +302,7 @@ def synsolvebeta(pY, pX, pYgX, pXgU, pYgV, **kwargs):
     #normalize the conditional pmfs
     V2 = V2/(V2.sum(axis=1)[:,np.newaxis])
     
-    #find best match
+    #find best match between V1,V2
     I = -1
     for pU, pV in product(V1,V2):
         res = np.dot(pV.T, np.dot(A.T, pU))
@@ -392,6 +316,20 @@ def synsolvebeta(pY, pX, pYgX, pXgU, pYgV, **kwargs):
     
 
 def scipopt(B,C,D,a):
+    '''
+
+    Parameters
+    ----------
+    B : presented in the paper
+    C : presented in the paper
+    D : presented in the paper
+    a : presented in the paper
+
+    Returns
+    -------
+    the alpha-beta synergy for the node considered
+
+    '''
     def bar(x):
         return - x.dot(B).dot(x)
     b = len(B[0]) - a
@@ -402,4 +340,20 @@ def scipopt(B,C,D,a):
     u = - bar(minimize(bar, x0, method=method, bounds=boundaries, constraints=constraints).x)
     return  u
 
+def quantize(array,pres=0.01):
+    """
+    Function to reduce the decimal precision of an input array.
 
+    Parameters
+    ----------
+    array : np.array
+        numerical array to be quantized
+        
+    pres : float
+        desired precision
+
+    Returns
+    -------
+    np.array with quantized values
+    """
+    return ((pres**(-1))*array).round()*pres
